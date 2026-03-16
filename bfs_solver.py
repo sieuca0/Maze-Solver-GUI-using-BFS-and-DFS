@@ -36,7 +36,7 @@ def bfs_solver(maze):
                 current = parent[current]
             path.append(start)
             path.reverse()
-            runtime = (time.perf_counter() - start_time) * 1000
+            runtime = time.perf_counter() - start_time
             return path, visited_count, runtime, visited_order
 
         row, column = current
@@ -51,7 +51,7 @@ def bfs_solver(maze):
                     parent[(new_row, new_column)] = current
                     queue.append((new_row, new_column))
 
-    runtime = (time.perf_counter() - start_time) * 1000
+    runtime = time.perf_counter() - start_time
     return None, visited_count, runtime, visited_order
 
 
@@ -69,5 +69,5 @@ if __name__ == "__main__":
     path, visited_count, runtime, visited_order = bfs_solver(maze)
     print("Path:", path)
     print("Visited Count:", visited_count)
-    print("Runtime:", f"{runtime:.7f}", "miliseconds")
+    print("Runtime:", f"{runtime:.7f}", "seconds")
     print("Visited Order:", visited_order)

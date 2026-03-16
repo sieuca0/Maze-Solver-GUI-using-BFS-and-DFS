@@ -2,13 +2,14 @@ import tkinter as tk
 import random
 from bfs_solver import bfs_solver
 from dfs_solver import dfs_solver
+import time
 
+# Constanst/ Global var
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 800
 LEFT_PANEL_WIDTH = 250
 CANVAS_SIZE = 800
 DELAY = 10
-WALL_CHANCE = 0.38
 
 window = tk.Tk()
 window.title("Maze Solver")
@@ -18,52 +19,106 @@ current_maze = []
 current_path = None
 current_visited_order = []
 current_step = 0
-is_animating = False
+animating = False
+animation_start_time = None
+algorithm_runtime = 0
 
+# UI setup
+# Left panel for control system
+left_panel = tk.Frame(window, width=LEFT_PANEL_WIDTH, height=WINDOW_HEIGHT, bg="#3160B0")
+left_panel.pack(side="left", fill="y")
+left_panel.pack_propagate(False)
 
-# ---------- UI SETUP ----------
-left_frame = tk.Frame(window, width=LEFT_PANEL_WIDTH, height=WINDOW_HEIGHT, bg="lightgray")
-left_frame.pack(side="left", fill="y")
-left_frame.pack_propagate(False)
+# Right panel for maze visualizer
+right_panel = tk.Frame(window, width=WINDOW_WIDTH - LEFT_PANEL_WIDTH, height=WINDOW_HEIGHT, bg= "white")
+right_panel.pack(side="right", fill="both", expand=True)
 
-right_frame = tk.Frame(window, width=WINDOW_WIDTH - LEFT_PANEL_WIDTH, height=WINDOW_HEIGHT)
-right_frame.pack(side="right", fill="both", expand=True)
-
-label_title = tk.Label(left_frame, text="Maze Controls", font=("Arial", 16, "bold"), bg="lightgray")
+label_title = tk.Label(left_panel, text="Setting", font=("Arial", 16, "bold"), bg="#3160B0", fg="white")
 label_title.pack(pady=20)
 
 algorithm_var = tk.StringVar(value="BFS")
 
-label_algorithm = tk.Label(left_frame, text="Choose Algorithm:", font=("Arial", 12), bg="lightgray")
+label_algorithm = tk.Label(left_panel, text="Choose Algorithm:", font=("Arial", 12), bg="#3160B0", fg="white")
 label_algorithm.pack(pady=10)
 
-tk.Radiobutton(left_frame, text="BFS", variable=algorithm_var, value="BFS", bg="lightgray").pack()
-tk.Radiobutton(left_frame, text="DFS", variable=algorithm_var, value="DFS", bg="lightgray").pack()
+tk.Radiobutton(left_panel, text="BFS", variable=algorithm_var, value="BFS", bg="#3160B0", fg="white").pack()
+tk.Radiobutton(left_panel, text="DFS", variable=algorithm_var, value="DFS", bg="#3160B0", fg="white").pack()
 
-label_rows = tk.Label(left_frame, text="Rows:", font=("Arial", 12), bg="lightgray")
+label_rows = tk.Label(left_panel, text="Rows:", font=("Arial", 12), bg="#3160B0", fg="white")
 label_rows.pack(pady=(20, 5))
-entry_rows = tk.Entry(left_frame)
+entry_rows = tk.Entry(left_panel)
 entry_rows.pack()
 entry_rows.insert(0, "20")
 
-label_cols = tk.Label(left_frame, text="Cols:", font=("Arial", 12), bg="lightgray")
+label_cols = tk.Label(left_panel, text="Columns:", font=("Arial", 12), bg="#3160B0", fg="white")
 label_cols.pack(pady=(20, 5))
-entry_cols = tk.Entry(left_frame)
+entry_cols = tk.Entry(left_panel)
 entry_cols.pack()
 entry_cols.insert(0, "20")
 
-result_label = tk.Label(
-    left_frame,
-    text="Generate a maze, then click Solve",
-    font=("Arial", 11),
-    bg="lightgray",
-    wraplength=220,
-    justify="left"
-)
-result_label.pack(pady=20)
+result_label = tk.Label(left_panel, text="Generate a maze, then click Solve", font=("Arial", 11), bg="#3160B0", wraplength=220, justify="left", fg="white")
 
-canvas = tk.Canvas(right_frame, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="white")
+canvas = tk.Canvas(right_panel, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="white")
 canvas.pack(padx=20, pady=20)
+
+
+# ---------- MAZE GENERATION ----------
+def make_odd_size(number):
+    if number < 5:
+        return 5
+    if number % 2 == 0:
+        return number + 1
+    return number
+
+
+def build_maze(rows, cols):
+    rows = make_odd_size(rows)
+    cols = make_odd_size(cols)
+
+    maze = [['#' for _ in range(cols)] for _ in range(rows)]
+    stack = [(1, 1)]
+    visited_cells = {(1, 1)}
+    maze[1][1] = '.'
+
+    def get_unvisited_neighbors(row, column):
+        neighbors = []
+        directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
+
+        for row_change, column_change in directions:
+            new_row = row + row_change
+            new_column = column + column_change
+
+            if 1 <= new_row < rows - 1 and 1 <= new_column < cols - 1:
+                if (new_row, new_column) not in visited_cells:
+                    neighbors.append((new_row, new_column))
+
+        return neighbors
+
+    while stack:
+        row, column = stack[-1]
+        neighbors = get_unvisited_neighbors(row, column)
+
+        if neighbors:
+            new_row, new_column = random.choice(neighbors)
+            wall_row = (row + new_row) // 2
+            wall_column = (column + new_column) // 2
+
+            maze[wall_row][wall_column] = '.'
+            maze[new_row][new_column] = '.'
+            visited_cells.add((new_row, new_column))
+            stack.append((new_row, new_column))
+        else:
+            stack.pop()
+
+    maze[1][1] = 'S'
+    maze[rows - 2][cols - 2] = 'E'
+
+    if rows > 3:
+        maze[rows - 3][cols - 2] = '.'
+    if cols > 3:
+        maze[rows - 2][cols - 3] = '.'
+
+    return maze
 
 
 # ---------- DRAWING ----------
@@ -104,18 +159,24 @@ def draw_maze(visited_set=None, path_set=None):
 
             if cell == '#':
                 color = 'black'
+                outline = ''
             elif cell == 'S':
-                color = 'green'
+                color = '#3160B0'
+                outline = '#3160B0' 
             elif cell == 'E':
-                color = 'red'
+                color = '#E06623'
+                outline = '#E06623'
             elif (row, column) in path_set:
-                color = 'yellow'
+                color = '#DA4848'
+                outline = ''
             elif (row, column) in visited_set:
-                color = 'light blue'
+                color = '#76D2DB'
+                outline = ''
             else:
-                color = 'white'
+                color = '#F7F6E5'
+                outline = ''
 
-            canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline='gray')
+            canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline=outline)
 
             if cell in ['S', 'E']:
                 font_size = max(8, cell_size // 2)
@@ -128,78 +189,48 @@ def draw_maze(visited_set=None, path_set=None):
                 )
 
 
-# ---------- MAZE GENERATION ----------
-def make_odd_size(number):
-    if number < 5:
-        return 5
-    if number % 2 == 0:
-        return number + 1
-    return number
+def update_result_label(algorithm, path, visited_count, runtime, animation_runtime=None):
+
+    if path is None:
+        path_text = "No Path Found"
+    else:
+        path_text = f"Path Length: {len(path) - 1}"
+
+    text = (
+        f"Algorithm: {algorithm}\n"
+        f"{path_text}\n"
+        f"Visited: {visited_count}\n"
+        f"Runtime: {runtime:.7f} seconds"
+    )
+
+    if animation_runtime is not None:
+        text += f"\nAnimation Runtime: {animation_runtime:.7f} seconds"
+
+    result_label.config(text=text)
 
 
+def finish_animation():
+    global animating, animation_start_time
 
-def get_two_step_neighbors(row, column, rows, cols, visited_cells):
-    neighbors = []
-    directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
+    animating = False
+    draw_maze(set(), set(current_path))
 
-    for row_change, column_change in directions:
-        new_row = row + row_change
-        new_column = column + column_change
+    if animation_start_time is None:
+        return
 
-        if 1 <= new_row < rows - 1 and 1 <= new_column < cols - 1:
-            if (new_row, new_column) not in visited_cells:
-                neighbors.append((new_row, new_column))
-
-    return neighbors
-
-
-
-def generate_perfect_maze(rows, cols):
-    rows = make_odd_size(rows)
-    cols = make_odd_size(cols)
-
-    maze = [['#' for _ in range(cols)] for _ in range(rows)]
-    stack = [(1, 1)]
-    visited_cells = {(1, 1)}
-    maze[1][1] = '.'
-
-    while stack:
-        row, column = stack[-1]
-        neighbors = get_two_step_neighbors(row, column, rows, cols, visited_cells)
-
-        if neighbors:
-            new_row, new_column = random.choice(neighbors)
-
-            wall_row = (row + new_row) // 2
-            wall_column = (column + new_column) // 2
-
-            maze[wall_row][wall_column] = '.'
-            maze[new_row][new_column] = '.'
-
-            visited_cells.add((new_row, new_column))
-            stack.append((new_row, new_column))
-        else:
-            stack.pop()
-
-    maze[1][1] = 'S'
-    maze[rows - 2][cols - 2] = 'E'
-
-    if rows > 3:
-        maze[rows - 3][cols - 2] = '.'
-    if cols > 3:
-        maze[rows - 2][cols - 3] = '.'
-
-    return maze
-
-
-
-def generate_random_maze(rows, cols):
-    return generate_perfect_maze(rows, cols)
-
+    animation_runtime = time.perf_counter() - animation_start_time
+    update_result_label(
+        algorithm_var.get(),
+        current_path,
+        len(current_visited_order),
+        algorithm_runtime,
+        animation_runtime
+    )
+    animation_start_time = None
 
 # ---------- ANIMATION ----------
 def animate_search():
-    global current_step, is_animating
+    global current_step
 
     if current_step <= len(current_visited_order):
         visited_set = set(current_visited_order[:current_step])
@@ -208,48 +239,30 @@ def animate_search():
         current_step += 1
         window.after(DELAY, animate_search)
     else:
-        is_animating = False
+        finish_animation()
 
 
 # ---------- BUTTON ACTIONS ----------
-def solve_maze():
-    global current_path, current_visited_order, current_step, is_animating
+def solve_maze_button():
+    global current_path, current_visited_order, current_step, animating, animation_start_time, algorithm_runtime
 
-    if not current_maze or is_animating:
+    if not current_maze or animating:
         return
 
     if algorithm_var.get() == "BFS":
-        current_path, visited_count, runtime, current_visited_order = bfs_solver(current_maze)
+        current_path, visited_count, algorithm_runtime, current_visited_order = bfs_solver(current_maze)
     else:
-        current_path, visited_count, runtime, current_visited_order = dfs_solver(current_maze)
+        current_path, visited_count, algorithm_runtime, current_visited_order = dfs_solver(current_maze)
 
     current_step = 0
-    is_animating = True
+    animating = True
+    animation_start_time = time.perf_counter()
 
-    if current_path is None:
-        result_label.config(
-            text=(
-                f"Algorithm: {algorithm_var.get()}\n"
-                f"No Path Found\n"
-                f"Visited: {visited_count}\n"
-                f"Runtime: {runtime:.7f} seconds"
-            )
-        )
-    else:
-        result_label.config(
-            text=(
-                f"Algorithm: {algorithm_var.get()}\n"
-                f"Path Length: {len(current_path) - 1}\n"
-                f"Visited: {visited_count}\n"
-                f"Runtime: {runtime:.7f} seconds"
-            )
-        )
-
+    update_result_label(algorithm_var.get(), current_path, visited_count, algorithm_runtime)
     animate_search()
 
-
-def generate_maze():
-    global current_maze, current_path, current_visited_order, current_step, is_animating
+def generate_maze_button():
+    global current_maze, current_path, current_visited_order, current_step, animating
 
     try:
         rows = int(entry_rows.get())
@@ -262,32 +275,22 @@ def generate_maze():
         result_label.config(text="Rows and Cols must be at least 5")
         return
 
-    current_maze = generate_random_maze(rows, cols)
+    current_maze = build_maze(rows, cols)
     rows = len(current_maze)
     cols = len(current_maze[0])
     current_path = None
     current_visited_order = []
     current_step = 0
-    is_animating = False
-    result_label.config(text=f"Generated maze: {rows} x {cols} (perfect maze)")
+    animating = False
+    result_label.config(text=f"Generated maze: {rows} x {cols}")
     draw_maze()
 
 
-# ---------- BUTTONS ----------
-tk.Button(left_frame, text="Generate Maze", width=18, command=generate_maze).pack(pady=10)
-tk.Button(left_frame, text="Solve", width=18, command=solve_maze).pack(pady=10)
+# Buttons generator
+tk.Button(left_panel, text="Generate Maze", width=18, command=generate_maze_button, bg="white", fg="#3160B0").pack(pady=10)
+tk.Button(left_panel, text="Solve", width=18, command=solve_maze_button, bg="white", fg="#3160B0").pack(pady=10)
 
+#Display the result info 
+result_label.pack(pady=20)
 
-# ---------- STARTUP MAZE ----------
-current_maze = [
-    ['#', '#', '#', '#', '#', '#', '#'],
-    ['#', 'S', '.', '.', '.', '.', '#'],
-    ['#', '.', '#', '#', '#', '.', '#'],
-    ['#', '.', '.', 'E', '#', '.', '#'],
-    ['#', '.', '#', '.', '#', '.', '#'],
-    ['#', '.', '.', '.', '.', '.', '#'],
-    ['#', '#', '#', '#', '#', '#', '#']
-]
-
-draw_maze()
 window.mainloop()
