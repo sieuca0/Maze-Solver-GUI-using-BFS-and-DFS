@@ -1,6 +1,7 @@
 Group Project: Maze Solver GUI using BFS and DFS approach
 
 Group #1
+
 Team member: Hai Sieu Cao, Kevin Mabry, Saif Al Habashneh
 
 Role:
