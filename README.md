@@ -1,7 +1,12 @@
+<<<<<<< Updated upstream
 Group Project: Maze Solver GUI using BFS and DFS approach
 
 Group #1
 
+=======
+Group Project: Maze Solver GUI using BFS and DFS
+Group 1
+>>>>>>> Stashed changes
 Team member: Hai Sieu Cao, Kevin Mabry, Saif Al Habashneh
 
 Role:
